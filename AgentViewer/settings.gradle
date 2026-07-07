@@ -1,3 +1,2 @@
 rootProject.name = "AgentViewer"
 include(":app")
-project(":app").projectDir = new File(rootDir, ".")
