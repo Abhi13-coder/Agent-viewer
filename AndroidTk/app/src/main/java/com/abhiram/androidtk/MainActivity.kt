@@ -51,6 +51,7 @@ class MainActivity : Activity() {
             setContentView(R.layout.activity_main)
 
             terminalView = findViewById(R.id.terminalView)
+            terminalView.setTextSize(28)
             val statusText = findViewById<TextView>(R.id.statusText)
             val grantButton = findViewById<Button>(R.id.grantOverlayButton)
 
