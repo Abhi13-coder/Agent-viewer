@@ -41,6 +41,15 @@ jobs:
         with:
           gradle-version: "8.9"
 
+      - name: Bundle busybox for both 32-bit and 64-bit devices
+        run: |
+          mkdir -p AndroidTk/app/src/main/jniLibs/armeabi-v7a
+          mkdir -p AndroidTk/app/src/main/jniLibs/arm64-v8a
+          curl -L -o AndroidTk/app/src/main/jniLibs/armeabi-v7a/libbusybox.so \
+            https://github.com/xerta555/Busybox-Binaries/raw/refs/heads/master/busybox-arm
+          curl -L -o AndroidTk/app/src/main/jniLibs/arm64-v8a/libbusybox.so \
+            https://github.com/xerta555/Busybox-Binaries/raw/refs/heads/master/busybox-arm64
+
       - name: Build debug APK
         working-directory: AndroidTk
         run: gradle assembleDebug --stacktrace
