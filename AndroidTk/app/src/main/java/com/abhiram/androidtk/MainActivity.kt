@@ -110,8 +110,15 @@ class MainActivity : Activity() {
             }
             override fun onTitleChanged(changedSession: TerminalSession) {}
             override fun onSessionFinished(finishedSession: TerminalSession) {}
-            override fun onCopyTextToClipboard(session: TerminalSession, text: String) {}
-            override fun onPasteTextFromClipboard(session: TerminalSession?) {}
+            override fun onCopyTextToClipboard(session: TerminalSession, text: String) {
+                val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("terminal", text))
+            }
+            override fun onPasteTextFromClipboard(session: TerminalSession?) {
+                val clipboard = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                val clip = clipboard.primaryClip?.getItemAt(0)?.text
+                if (clip != null) this@MainActivity.session?.write(clip.toString())
+            }
             override fun onBell(session: TerminalSession) {}
             override fun onColorsChanged(session: TerminalSession) {}
             override fun onTerminalCursorStateChange(state: Boolean) {}
