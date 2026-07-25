@@ -50,12 +50,17 @@ jobs:
 
       - name: Bundle proot for both 32-bit and 64-bit devices
         run: |
-          curl -L -o /tmp/proot-arm.deb \
-            https://plug-mirror.rcac.purdue.edu/termux/apt/termux-main/pool/main/p/proot/proot_5.1.107-65_arm.deb
-          curl -L -o /tmp/proot-aarch64.deb \
-            https://plug-mirror.rcac.purdue.edu/termux/apt/termux-main/pool/main/p/proot/proot_5.1.107-65_aarch64.deb
-          dpkg-deb -x /tmp/proot-arm.deb /tmp/proot-arm-extract
-          dpkg-deb -x /tmp/proot-aarch64.deb /tmp/proot-aarch64-extract
+          for arch in arm aarch64; do
+            curl -sL "https://packages-cf.termux.dev/apt/termux-main/dists/stable/main/binary-${arch}/Packages.gz" -o /tmp/Packages-${arch}.gz
+            gunzip -f /tmp/Packages-${arch}.gz
+            FILENAME=$(awk '
+              /^Package: /{p=$2; f=""}
+              /^Filename: /{f=$2}
+              p=="proot" && f!="" {print f; exit}
+            ' /tmp/Packages-${arch} | tr -d '\r\n')
+            curl -L -o /tmp/proot-${arch}.deb "https://packages-cf.termux.dev/apt/termux-main/${FILENAME}"
+            dpkg-deb -x /tmp/proot-${arch}.deb /tmp/proot-${arch}-extract
+          done
           cp /tmp/proot-arm-extract/data/data/com.termux/files/usr/bin/proot \
             AndroidTk/app/src/main/jniLibs/armeabi-v7a/libproot.so
           cp /tmp/proot-aarch64-extract/data/data/com.termux/files/usr/bin/proot \
