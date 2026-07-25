@@ -17,6 +17,9 @@ jobs:
 
           echo "=== sizes (expect ~78208 and ~84884 bytes) ==="
           ls -la /tmp/proot-arm.deb /tmp/proot-aarch64.deb
+          
+          echo "=== actual content of the failed download ==="
+          cat /tmp/proot-arm.deb
 
           echo "=== extracting ==="
           dpkg-deb -x /tmp/proot-arm.deb /tmp/proot-arm-extract
