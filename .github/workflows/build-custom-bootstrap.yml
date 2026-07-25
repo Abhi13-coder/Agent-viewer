@@ -59,6 +59,9 @@ jobs:
           mkdir -p toolchain-cache
           set -o pipefail
           docker run --rm \
+            --device=/dev/fuse \
+            --cap-add SYS_ADMIN \
+            --security-opt apparmor:unconfined \
             -v "$(pwd)/termux-packages:/home/builder/termux-packages" \
             -v "$(pwd)/toolchain-cache:/home/builder/.termux-build" \
             -w /home/builder/termux-packages \
