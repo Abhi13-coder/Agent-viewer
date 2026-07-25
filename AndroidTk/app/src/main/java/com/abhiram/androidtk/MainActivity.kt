@@ -212,17 +212,13 @@ class MainActivity : Activity() {
      * the pty attaching. The user can permanently change it themselves by
      * editing $HOME/.profile directly. */
     private fun ensureDefaultProfile() {
-        val profile = File(filesDir, ".profile")
-        if (!profile.exists()) {
-            profile.writeText(
-                "export PS1='Atk\$ '\n" +
-                "atk() {\n" +
-                "  busybox nc 127.0.0.1 7191 <<EOF\n" +
-                "\$@\n" +
-                "EOF\n" +
-                "}\n"
-            )
-        }
+    val profile = File(filesDir, ".profile")
+    if (!profile.exists()) {
+        profile.writeText(
+            "export PS1='Atk\$ '\n" +
+            "atk() { echo \"\$@\" | busybox nc 127.0.0.1 7191; }\n"
+        )
+    }
     }
 
     private fun buildEnv(home: String): Array<String> = arrayOf(
