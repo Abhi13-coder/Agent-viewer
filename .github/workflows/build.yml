@@ -48,40 +48,41 @@ jobs:
           curl -L -o AndroidTk/app/src/main/jniLibs/arm64-v8a/libbusybox.so \
             https://github.com/xerta555/Busybox-Binaries/raw/refs/heads/master/busybox-arm64
 
-      - name: Bundle proot for both 32-bit and 64-bit devices
+      - name: Bundle proot and its real dependencies (libtalloc, libandroid-shmem)
         run: |
           for arch in arm aarch64; do
             curl -sL "https://packages-cf.termux.dev/apt/termux-main/dists/stable/main/binary-${arch}/Packages.gz" -o /tmp/Packages-${arch}.gz
             gunzip -f /tmp/Packages-${arch}.gz
-            FILENAME=$(awk '
+          done
+
+          get_filename() {
+            local pkg=$1 arch=$2
+            awk -v pkg="$pkg" '
               /^Package: /{p=$2; f=""}
               /^Filename: /{f=$2}
-              p=="proot" && f!="" {print f; exit}
-            ' /tmp/Packages-${arch} | tr -d '\r\n')
-            curl -L -o /tmp/proot-${arch}.deb "https://packages-cf.termux.dev/apt/termux-main/${FILENAME}"
-            dpkg-deb -x /tmp/proot-${arch}.deb /tmp/proot-${arch}-extract
+              p==pkg && f!="" {print f; exit}
+            ' /tmp/Packages-${arch} | tr -d '\r\n'
+          }
+
+          for arch in arm aarch64; do
+            for pkg in proot libtalloc libandroid-shmem; do
+              FILENAME=$(get_filename "$pkg" "$arch")
+              echo "$pkg ($arch) -> $FILENAME"
+              curl -L -o /tmp/${pkg}-${arch}.deb "https://packages-cf.termux.dev/apt/termux-main/${FILENAME}"
+              dpkg-deb -x /tmp/${pkg}-${arch}.deb /tmp/${pkg}-${arch}-extract
+            done
           done
+
           cp /tmp/proot-arm-extract/data/data/com.termux/files/usr/bin/proot \
             AndroidTk/app/src/main/jniLibs/armeabi-v7a/libproot.so
           cp /tmp/proot-aarch64-extract/data/data/com.termux/files/usr/bin/proot \
             AndroidTk/app/src/main/jniLibs/arm64-v8a/libproot.so
 
-      - name: Bundle libtalloc (proot's dependency) for both architectures
-        run: |
-          for arch in arm aarch64; do
-            FILENAME=$(awk '
-              /^Package: /{p=$2; f=""}
-              /^Filename: /{f=$2}
-              p=="libtalloc" && f!="" {print f; exit}
-            ' /tmp/Packages-${arch} | tr -d '\r\n')
-            echo "libtalloc path for $arch: $FILENAME"
-            curl -L -o /tmp/libtalloc-${arch}.deb "https://packages-cf.termux.dev/apt/termux-main/${FILENAME}"
-            dpkg-deb -x /tmp/libtalloc-${arch}.deb /tmp/libtalloc-${arch}-extract
-            echo "=== actual .so file(s) inside, for $arch ==="
-            find /tmp/libtalloc-${arch}-extract -name "*.so*"
-          done
           find /tmp/libtalloc-arm-extract -name "libtalloc.so*" -exec cp {} AndroidTk/app/src/main/jniLibs/armeabi-v7a/libtalloc.so \;
           find /tmp/libtalloc-aarch64-extract -name "libtalloc.so*" -exec cp {} AndroidTk/app/src/main/jniLibs/arm64-v8a/libtalloc.so \;
+
+          find /tmp/libandroid-shmem-arm-extract -name "libandroid-shmem.so*" -exec cp {} AndroidTk/app/src/main/jniLibs/armeabi-v7a/libandroid-shmem.so \;
+          find /tmp/libandroid-shmem-aarch64-extract -name "libandroid-shmem.so*" -exec cp {} AndroidTk/app/src/main/jniLibs/arm64-v8a/libandroid-shmem.so \;
 
       - name: Build debug APK
         working-directory: AndroidTk
