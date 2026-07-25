@@ -74,6 +74,7 @@ class MainActivity : Activity() {
 
             installBundledBusybox()
             installBundledProot()
+            installBundledTalloc()
             ensureDefaultProfile()
 
             newSessionButton.setOnClickListener {
@@ -174,6 +175,28 @@ class MainActivity : Activity() {
                 Os.symlink(bundled.absolutePath, prootLink.absolutePath)
             } catch (e: Exception) {
                 logFile.appendText("proot symlink failed: $e\n")
+            }
+        }
+    }
+
+    private fun installBundledTalloc() {
+        val home = filesDir.absolutePath
+        val libDir = File(home, "lib").apply { mkdirs() }
+        val bundled = File(applicationInfo.nativeLibraryDir, "libtalloc.so")
+        // proot looks for the exact SONAME "libtalloc.so.2" — the file bundled
+        // via jniLibs must be named "libtalloc.so" (Android's packaging
+        // requirement), so we symlink the SONAME proot actually asks for
+        // to that bundled file.
+        val tallocLink = File(libDir, "libtalloc.so.2")
+        if (!bundled.exists()) {
+            File(filesDir, "install.log").appendText("libtalloc missing at ${bundled.absolutePath}\n")
+            return
+        }
+        if (!tallocLink.exists()) {
+            try {
+                Os.symlink(bundled.absolutePath, tallocLink.absolutePath)
+            } catch (e: Exception) {
+                File(filesDir, "install.log").appendText("libtalloc symlink failed: $e\n")
             }
         }
     }
