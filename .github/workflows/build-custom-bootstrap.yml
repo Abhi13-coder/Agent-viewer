@@ -1,0 +1,124 @@
+name: Build custom-prefix Termux pkg manager
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm, aarch64]
+    steps:
+      - name: Aggressively free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: Clone termux-packages
+        run: git clone --depth=1 https://github.com/termux/termux-packages.git
+
+      - name: Set our own app package name / prefix
+        run: |
+          cd termux-packages
+          sed -i 's/^TERMUX_APP_PACKAGE=.*/TERMUX_APP_PACKAGE="com.abhiram.androidtk"/' scripts/properties.sh
+          grep TERMUX_APP_PACKAGE scripts/properties.sh
+
+      - name: Restore cached toolchain
+        uses: actions/cache@v4
+        with:
+          path: toolchain-cache
+          key: termux-toolchain-${{ matrix.arch }}-v1
+
+      - name: Restore cached Docker image
+        uses: actions/cache@v4
+        with:
+          path: docker-image-cache
+          key: termux-builder-image-v1
+
+      - name: Load or pull the build image
+        run: |
+          if [ -f docker-image-cache/image.tar ]; then
+            docker load -i docker-image-cache/image.tar
+          else
+            docker pull ghcr.io/termux/package-builder
+            mkdir -p docker-image-cache
+            docker save ghcr.io/termux/package-builder -o docker-image-cache/image.tar
+          fi
+
+      - name: Build apt, dpkg, ca-certificates for our own prefix
+        run: |
+          mkdir -p toolchain-cache
+          docker run --rm \
+            -v "$(pwd)/termux-packages:/home/builder/termux-packages" \
+            -v "$(pwd)/toolchain-cache:/home/builder/.termux-build" \
+            -w /home/builder/termux-packages \
+            ghcr.io/termux/package-builder \
+            ./build-package.sh -a ${{ matrix.arch }} apt dpkg ca-certificates 2>&1 | tee build.log
+
+      - name: Extract built .debs into our real app prefix structure
+        run: |
+          mkdir -p prefix-root
+          find termux-packages -name "*.deb" -print0 | while IFS= read -r -d '' deb; do
+            echo "extracting: $deb"
+            dpkg-deb -x "$deb" prefix-root
+          done
+          find prefix-root -maxdepth 6 -type d
+
+      - name: Create init files apt/dpkg expect on first run
+        run: |
+          USR="prefix-root/data/data/com.abhiram.androidtk/files/usr"
+          mkdir -p "$USR/var/lib/dpkg"
+          touch "$USR/var/lib/dpkg/status"
+          mkdir -p "$USR/var/lib/dpkg/info"
+          mkdir -p "$USR/var/cache/apt/archives/partial"
+          mkdir -p "$USR/etc/apt/apt.conf.d"
+          mkdir -p "$USR/etc/apt"
+          cat > "$USR/etc/apt/sources.list" <<'EOF'
+          # trusted=yes: skipping Termux's own signing key verification for now.
+          # This means apt won't cryptographically verify the repo — real HTTPS
+          # still protects you in transit, this only skips the extra repo-signature
+          # check. Upgrade later by importing Termux's real public key instead.
+          deb [trusted=yes] https://packages.termux.dev/apt/termux-main stable main
+          EOF
+
+      - name: Zip the result
+        run: |
+          cd prefix-root
+          zip -r ../androidtk-usr-${{ matrix.arch }}.zip data
+          cd ..
+
+      - name: Small readable summary
+        if: always()
+        run: |
+          {
+            echo "=== last 100 lines of build log ==="
+            tail -n 100 termux-packages/build.log 2>/dev/null || echo "no build.log"
+            echo "=== debs found ==="
+            find termux-packages -name "*.deb"
+            echo "=== zip size ==="
+            ls -la androidtk-usr-${{ matrix.arch }}.zip 2>/dev/null || echo "zip not created — build likely failed"
+          } > summary-${{ matrix.arch }}.txt
+
+      - name: Upload summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: summary-${{ matrix.arch }}
+          path: summary-${{ matrix.arch }}.txt
+
+      - name: Upload the usable zip (only if it exists)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: androidtk-usr-${{ matrix.arch }}
+          path: androidtk-usr-${{ matrix.arch }}.zip
+          if-no-files-found: ignore
