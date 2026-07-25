@@ -50,6 +50,19 @@ jobs:
           curl -L -o AndroidTk/app/src/main/jniLibs/arm64-v8a/libbusybox.so \
             https://github.com/xerta555/Busybox-Binaries/raw/refs/heads/master/busybox-arm64
 
+      - name: Bundle proot for both 32-bit and 64-bit devices
+        run: |
+          curl -L -o /tmp/proot-arm.deb \
+            https://plug-mirror.rcac.purdue.edu/termux/apt/termux-main/pool/main/p/proot/proot_5.1.107-65_arm.deb
+          curl -L -o /tmp/proot-aarch64.deb \
+            https://plug-mirror.rcac.purdue.edu/termux/apt/termux-main/pool/main/p/proot/proot_5.1.107-65_aarch64.deb
+          dpkg-deb -x /tmp/proot-arm.deb /tmp/proot-arm-extract
+          dpkg-deb -x /tmp/proot-aarch64.deb /tmp/proot-aarch64-extract
+          cp /tmp/proot-arm-extract/data/data/com.termux/files/usr/bin/proot \
+            AndroidTk/app/src/main/jniLibs/armeabi-v7a/libproot.so
+          cp /tmp/proot-aarch64-extract/data/data/com.termux/files/usr/bin/proot \
+            AndroidTk/app/src/main/jniLibs/arm64-v8a/libproot.so
+
       - name: Build debug APK
         working-directory: AndroidTk
         run: gradle assembleDebug --stacktrace
