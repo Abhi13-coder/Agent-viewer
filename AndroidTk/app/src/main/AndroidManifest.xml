@@ -33,6 +33,10 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="androidtk-window-server" />
         </service>
-
+        
+       <service
+            android:name=".AtkServerService"
+            android:exported="false" />
+    
     </application>
 </manifest>
