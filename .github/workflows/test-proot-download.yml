@@ -39,3 +39,10 @@ jobs:
           ls -la /tmp/proot-arm-extract/data/data/com.termux/files/usr/bin/proot
           ls -la /tmp/proot-aarch64-extract/data/data/com.termux/files/usr/bin/proot
           echo "SUCCESS"
+
+      - name: List ALL of proot's actual dependencies at once
+        run: |
+          echo "=== arm ==="
+          readelf -d /tmp/proot-arm-extract/data/data/com.termux/files/usr/bin/proot | grep NEEDED
+          echo "=== aarch64 ==="
+          readelf -d /tmp/proot-aarch64-extract/data/data/com.termux/files/usr/bin/proot | grep NEEDED
