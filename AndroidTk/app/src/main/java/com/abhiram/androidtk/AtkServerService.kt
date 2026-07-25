@@ -5,23 +5,18 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import java.io.BufferedReader
+import java.io.File
 import java.io.InputStreamReader
 import java.io.PrintWriter
 import java.net.InetAddress
 import java.net.ServerSocket
 
-/**
- * Background service hosting a loopback-only TCP listener on port 7191.
- * The `atk` shell function (defined in .profile) talks to this over
- * `busybox nc 127.0.0.1 7191`, so real shell sessions can trigger real
- * Kotlin-side package management without ever needing `atk` itself to
- * be an executable file.
- */
 class AtkServerService : Service() {
 
     private var serverThread: Thread? = null
     private var serverSocket: ServerSocket? = null
     private lateinit var atk: AtkPackageManager
+    private val logFile: File by lazy { File(filesDir, "install.log") }
 
     override fun onCreate() {
         super.onCreate()
@@ -29,7 +24,7 @@ class AtkServerService : Service() {
         val arch = when {
             Build.SUPPORTED_ABIS.contains("arm64-v8a") -> "aarch64"
             Build.SUPPORTED_ABIS.contains("armeabi-v7a") -> "arm"
-            else -> "arm" // safe fallback
+            else -> "arm"
         }
 
         atk = AtkPackageManager(filesDir, applicationInfo.nativeLibraryDir, arch)
@@ -37,12 +32,13 @@ class AtkServerService : Service() {
         serverThread = Thread {
             try {
                 serverSocket = ServerSocket(7191, 50, InetAddress.getLoopbackAddress())
+                logFile.appendText("AtkServerService: listening on 127.0.0.1:7191\n")
                 while (!Thread.currentThread().isInterrupted) {
                     val client = serverSocket?.accept() ?: break
                     Thread { handleClient(client) }.start()
                 }
             } catch (e: Exception) {
-                // socket closed on service stop, or bind failed — nothing to recover from here
+                logFile.appendText("AtkServerService: FAILED to bind/listen: $e\n")
             }
         }
         serverThread?.isDaemon = true
@@ -55,6 +51,7 @@ class AtkServerService : Service() {
             val writer = PrintWriter(s.getOutputStream(), true)
 
             val line = reader.readLine() ?: return
+            logFile.appendText("AtkServerService: received command: $line\n")
             val parts = line.trim().split(Regex("\\s+"))
             if (parts.isEmpty()) return
 
@@ -78,6 +75,7 @@ class AtkServerService : Service() {
                     else -> writer.println("unknown command: $cmd (supported: install, installed, refresh)")
                 }
             } catch (e: Exception) {
+                logFile.appendText("AtkServerService: error handling '$line': $e\n")
                 writer.println("error: ${e.message}")
             }
         }
@@ -91,3 +89,4 @@ class AtkServerService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 }
+    
