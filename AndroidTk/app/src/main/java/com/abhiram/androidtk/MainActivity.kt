@@ -74,7 +74,7 @@ class MainActivity : Activity() {
 
             installBundledBusybox()
             installBundledProot()
-            installBundledTalloc()
+            installBundledProotDeps()
             ensureDefaultProfile()
 
             newSessionButton.setOnClickListener {
@@ -179,26 +179,30 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun installBundledTalloc() {
+    private fun installBundledProotDeps() {
         val home = filesDir.absolutePath
         val libDir = File(home, "lib").apply { mkdirs() }
-        val bundled = File(applicationInfo.nativeLibraryDir, "libtalloc.so")
-        // proot looks for the exact SONAME "libtalloc.so.2" — the file bundled
-        // via jniLibs must be named "libtalloc.so" (Android's packaging
-        // requirement), so we symlink the SONAME proot actually asks for
-        // to that bundled file.
-        val tallocLink = File(libDir, "libtalloc.so.2")
-        if (!bundled.exists()) {
-            File(filesDir, "install.log").appendText("libtalloc missing at ${bundled.absolutePath}\n")
-            return
-        }
-        if (!tallocLink.exists()) {
-            try {
-                Os.symlink(bundled.absolutePath, tallocLink.absolutePath)
-            } catch (e: Exception) {
-                File(filesDir, "install.log").appendText("libtalloc symlink failed: $e\n")
+        val logFile = File(filesDir, "install.log")
+
+        fun linkAs(bundledName: String, sonameNeeded: String) {
+            val bundled = File(applicationInfo.nativeLibraryDir, bundledName)
+            val link = File(libDir, sonameNeeded)
+            if (!bundled.exists()) {
+                logFile.appendText("$bundledName missing at ${bundled.absolutePath}\n")
+                return
+            }
+            if (!link.exists()) {
+                try {
+                    Os.symlink(bundled.absolutePath, link.absolutePath)
+                } catch (e: Exception) {
+                    logFile.appendText("$bundledName symlink failed: $e\n")
+                }
             }
         }
+
+        // proot's NEEDED entries, exactly as readelf reported them:
+        linkAs("libtalloc.so", "libtalloc.so.2")
+        linkAs("libandroid-shmem.so", "libandroid-shmem.so")
     }
 
     /** Seeds a default prompt once. This file is sourced automatically by
