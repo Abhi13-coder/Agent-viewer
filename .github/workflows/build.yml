@@ -1,9 +1,7 @@
 name: Build AndroidTk APK
 
 on:
-  push:
-    branches: [main]
-  workflow_dispatch: {}
+ workflow_dispatch: {}
 
 jobs:
   build:
