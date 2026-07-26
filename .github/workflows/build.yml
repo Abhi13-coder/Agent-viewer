@@ -179,6 +179,14 @@ jobs:
           chmod +x app/src/main/jniLibs/armeabi-v7a/* app/src/main/jniLibs/arm64-v8a/* 2>/dev/null || true
           echo "=== armeabi-v7a ===" && ls app/src/main/jniLibs/armeabi-v7a/ 2>/dev/null
           echo "=== arm64-v8a ===" && ls app/src/main/jniLibs/arm64-v8a/ 2>/dev/null
+
+      - name: Commit fetched curl binaries
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add app/src/main/jniLibs/
+          git diff --staged --quiet || git commit -m "Fetch curl + deps from Termux repo"
+          git push
       
       - name: Build debug APK
         working-directory: AndroidTk
