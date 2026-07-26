@@ -210,7 +210,7 @@ class MainActivity : Activity() {
   private fun installBundledCurl() {
     val home = filesDir.absolutePath
     val binDir = File(home, "bin").apply { mkdirs() }
-    val bundled = File(applicationInfo.nativeLibraryDir, "libcurl.so")
+    val bundled = File(applicationInfo.nativeLibraryDir, "libcurl_bin.so")
     val curlLink = File(binDir, "curl")
     val logFile = File(filesDir, "install.log")
     if (!bundled.exists()) {
@@ -225,7 +225,7 @@ class MainActivity : Activity() {
             logFile.appendText("curl symlink failed: $e\n")
         }
     }
-}
+  }
 
     /** Copies the bundled atk.sh out of assets/ into $HOME once. This is
      * the entire atk package manager — pure shell, no server, no Kotlin
