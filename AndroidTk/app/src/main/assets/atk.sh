@@ -36,7 +36,7 @@ if [ "$ARCH" = "aarch64" ]; then LINKER="/system/bin/linker64"; else LINKER="/sy
 fetch() {
     url="$1"; out="$2"
     if command -v curl >/dev/null 2>&1; then
-        LD_LIBRARY_PATH="$HOME/lib:$LIB_DIR:$LD_LIBRARY_PATH" curl -fsSL -o "$out" "$url"l
+        LD_LIBRARY_PATH="$HOME/lib:$LIB_DIR:$LD_LIBRARY_PATH" curl -fsSL --cacert "$HOME/cacert.pem" -o "$out" "$url"
     else
         busybox wget -q -O "$out" "$url"
     fi
