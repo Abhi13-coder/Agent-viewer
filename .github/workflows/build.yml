@@ -86,7 +86,6 @@ jobs:
 
       - name: Fetch curl + real dependency chain from Termux's own repo
         run: |
-          set -e
           mkdir -p /tmp/termux-curl/arm /tmp/termux-curl/aarch64
           mkdir -p app/src/main/jniLibs/armeabi-v7a app/src/main/jniLibs/arm64-v8a
 
