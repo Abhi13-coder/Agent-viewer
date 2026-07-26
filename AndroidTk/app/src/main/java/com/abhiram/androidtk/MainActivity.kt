@@ -76,6 +76,7 @@ class MainActivity : Activity() {
             installBundledProot()
             installBundledProotDeps()
             installBundledCurl() 
+            installBundledExtraLibs()
             installBundledAtkScript() 
             ensureDefaultProfile()
 
@@ -242,6 +243,45 @@ class MainActivity : Activity() {
             dest.setExecutable(true)
         } catch (e: Exception) {
             File(filesDir, "install.log").appendText("atk.sh asset copy failed: $e\n")
+        }
+    }
+
+    /** Generic version of installBundledProotDeps() for every OTHER bundled
+     * .so that isn't already individually handled — covers curl's real
+     * dependencies (zlib, openssl, nghttp2, libcurl itself) without needing
+     * one hand-written function per library. Creates symlinks under
+     * progressively shorter names too (libfoo.so.1.2.3 -> libfoo.so.1.2 ->
+     * libfoo.so.1 -> libfoo.so) since we don't always know in advance which
+     * exact SONAME string a given binary asks for. */
+    private fun installBundledExtraLibs() {
+        val home = filesDir.absolutePath
+        val libDir = File(home, "lib").apply { mkdirs() }
+        val logFile = File(filesDir, "install.log")
+        val handledAlready = setOf("libbusybox.so", "libproot.so", "libtalloc.so", "libandroid-shmem.so", "libcurl_bin.so")
+
+        val nativeDir = File(applicationInfo.nativeLibraryDir)
+        val libs = nativeDir.listFiles { f -> f.name.startsWith("lib") && f.name.contains(".so") } ?: return
+
+        for (bundled in libs) {
+            if (bundled.name in handledAlready) continue
+            bundled.setExecutable(true)
+
+            var name = bundled.name
+            while (true) {
+                val link = File(libDir, name)
+                if (!link.exists()) {
+                    try {
+                        Os.symlink(bundled.absolutePath, link.absolutePath)
+                    } catch (e: Exception) {
+                        logFile.appendText("extra-lib symlink failed ($name): $e\n")
+                    }
+                }
+                val lastDot = name.lastIndexOf('.')
+                if (lastDot <= 0) break
+                val truncated = name.substring(0, lastDot)
+                if (truncated == name || !truncated.contains(".so")) break
+                name = truncated
+            }
         }
     }
 
