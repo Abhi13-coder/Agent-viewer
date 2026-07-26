@@ -117,7 +117,7 @@ jobs:
             }
 
             declare -A seen
-            queue=("curl" "ca-certificates")
+            queue=("curl" "ca-certificates" "zlib")
             while [ ${#queue[@]} -gt 0 ]; do
               pkg="${queue[0]}"; queue=("${queue[@]:1}")
               [ -n "${seen[$pkg]}" ] && continue
@@ -192,6 +192,23 @@ jobs:
           ls -la AndroidTk/app/src/main/jniLibs/arm64-v8a/
           echo "=== assets ==="
           ls -la AndroidTk/app/src/main/assets/
+
+      - name: Verify no other dependencies are missing (catch everything now, not one at a time)
+        run: |
+          for abi in armeabi-v7a arm64-v8a; do
+            dir="AndroidTk/app/src/main/jniLibs/$abi"
+            echo "=== checking $abi ==="
+            present=$(ls "$dir" 2>/dev/null)
+            for f in "$dir"/*; do
+              [ -f "$f" ] || continue
+              needed=$(readelf -d "$f" 2>/dev/null | grep NEEDED | sed 's/.*\[\(.*\)\]/\1/')
+              for lib in $needed; do
+                echo "$present" | grep -qx "$lib" || \
+                  echo "$present" | grep -q "^${lib%.so*}" || \
+                  echo "MISSING for $(basename "$f"): $lib"
+              done
+            done
+          done
 
       - name: Build debug APK
         working-directory: AndroidTk
