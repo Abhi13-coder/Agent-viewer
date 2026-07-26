@@ -94,9 +94,11 @@ jobs:
             local workdir="/tmp/termux-curl/$termux_arch"
             local base="https://packages-cf.termux.dev/apt/termux-main"
 
+            echo ">>> [$termux_arch] fetching index"
             curl -fsSL -o "$workdir/Packages.gz" \
-              "$base/dists/stable/main/binary-$termux_arch/Packages.gz"
-            gunzip -f "$workdir/Packages.gz"
+              "$base/dists/stable/main/binary-$termux_arch/Packages.gz" || { echo "!!! index download FAILED for $termux_arch"; return 1; }
+            gunzip -f "$workdir/Packages.gz" || { echo "!!! gunzip FAILED for $termux_arch"; return 1; }
+            echo ">>> [$termux_arch] index ok, $(wc -l < "$workdir/Packages") lines"
 
             find_pkg() {
               awk -v want="$1" '
@@ -119,30 +121,45 @@ jobs:
               [ -n "${seen[$pkg]}" ] && continue
               seen[$pkg]=1
 
+              echo ">>> [$termux_arch] resolving $pkg"
               row=$(find_pkg "$pkg")
-              [ -z "$row" ] && { echo "warning: $pkg not found for $termux_arch"; continue; }
+              if [ -z "$row" ]; then echo "!!! [$termux_arch] $pkg NOT FOUND in index, skipping"; continue; fi
 
               fname=$(echo "$row" | cut -f2)
               deps=$(echo "$row" | cut -f3 | tr ',' '\n' | sed 's/|.*//' | sed 's/(.*//' | sed 's/^ *//;s/ *$//' | grep -v '^$')
+              echo ">>> [$termux_arch] $pkg -> $fname (deps: $deps)"
 
               debfile="$workdir/$(basename "$fname")"
-              curl -fsSL -o "$debfile" "$base/$fname"
+              if ! curl -fsSL -o "$debfile" "$base/$fname"; then
+                echo "!!! [$termux_arch] download FAILED for $pkg ($fname), skipping"
+                continue
+              fi
 
               extractdir="$workdir/extract-$pkg"
               mkdir -p "$extractdir"
-              ( cd "$extractdir" && ar -x "$debfile" )
+              if ! ( cd "$extractdir" && ar -x "$debfile" ); then
+                echo "!!! [$termux_arch] ar extract FAILED for $pkg, skipping"
+                continue
+              fi
 
-              datatar=$(ls "$extractdir"/data.tar.* | head -n1)
+              datatar=$(ls "$extractdir"/data.tar.* 2>/dev/null | head -n1)
+              if [ -z "$datatar" ]; then
+                echo "!!! [$termux_arch] no data.tar.* found for $pkg, skipping"
+                continue
+              fi
+
               datadir="$extractdir/data"; mkdir -p "$datadir"
               case "$datatar" in
-                *.xz) tar -xJf "$datatar" -C "$datadir" ;;
-                *.gz) tar -xzf "$datatar" -C "$datadir" ;;
-                *)    tar -xf  "$datatar" -C "$datadir" ;;
+                *.xz) tar -xJf "$datatar" -C "$datadir" || echo "!!! tar -xJf failed for $pkg" ;;
+                *.gz) tar -xzf "$datatar" -C "$datadir" || echo "!!! tar -xzf failed for $pkg" ;;
+                *.zst) echo "!!! [$termux_arch] $pkg uses zstd, unsupported, skipping"; continue ;;
+                *)    tar -xf  "$datatar" -C "$datadir" || echo "!!! tar -xf failed for $pkg" ;;
               esac
 
               for dep in $deps; do queue+=("$dep"); done
             done
 
+            echo ">>> [$termux_arch] flattening into jniLibs/$jni_abi"
             find "$workdir" -path "*/data/*" -type f 2>/dev/null | while read -r f; do
               case "$f" in
                 *.so|*.so.*)
@@ -159,9 +176,9 @@ jobs:
           fetch_for_arch "aarch64" "arm64-v8a"
 
           chmod +x app/src/main/jniLibs/armeabi-v7a/* app/src/main/jniLibs/arm64-v8a/* 2>/dev/null || true
-          echo "=== armeabi-v7a ===" && ls app/src/main/jniLibs/armeabi-v7a/
-          echo "=== arm64-v8a ===" && ls app/src/main/jniLibs/arm64-v8a/
-
+          echo "=== armeabi-v7a ===" && ls app/src/main/jniLibs/armeabi-v7a/ 2>/dev/null
+          echo "=== arm64-v8a ===" && ls app/src/main/jniLibs/arm64-v8a/ 2>/dev/null
+      
       - name: Build debug APK
         working-directory: AndroidTk
         run: gradle assembleDebug --stacktrace
