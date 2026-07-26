@@ -1,0 +1,14 @@
+name: Test Termux Repo Reachability
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Try downloading Termux Packages.gz
+        run: |
+          curl -fsSL -o /tmp/test.gz "https://packages-cf.termux.dev/apt/termux-main/dists/stable/main/binary-arm/Packages.gz"
+          gunzip -f /tmp/test.gz
+          wc -l /tmp/test
