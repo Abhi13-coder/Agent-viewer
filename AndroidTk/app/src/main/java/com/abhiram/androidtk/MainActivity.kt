@@ -77,6 +77,7 @@ class MainActivity : Activity() {
             installBundledProotDeps()
             installBundledCurl() 
             installBundledExtraLibs()
+            installBundledVersionedLibs()
             installBundledAtkScript() 
             ensureDefaultProfile()
 
@@ -283,6 +284,37 @@ class MainActivity : Activity() {
                 name = truncated
             }
         }
+    }
+
+    /** libz/libssl/libcrypto get bundled under plain names (Android's
+     * installer silently drops any native-lib filename with extra dots
+     * after ".so", e.g. "libz.so.1.3.2" never reaches nativeLibraryDir at
+     * all) — so we rename them at build time and symlink to the real
+     * SONAME the linker actually looks for here, on-device. */
+    private fun installBundledVersionedLibs() {
+        val home = filesDir.absolutePath
+        val libDir = File(home, "lib").apply { mkdirs() }
+        val logFile = File(filesDir, "install.log")
+
+        fun linkAs(bundledName: String, sonameNeeded: String) {
+            val bundled = File(applicationInfo.nativeLibraryDir, bundledName)
+            val link = File(libDir, sonameNeeded)
+            if (!bundled.exists()) {
+                logFile.appendText("$bundledName missing at ${bundled.absolutePath}\n")
+                return
+            }
+            if (!link.exists()) {
+                try {
+                    Os.symlink(bundled.absolutePath, link.absolutePath)
+                } catch (e: Exception) {
+                    logFile.appendText("$bundledName symlink failed: $e\n")
+                }
+            }
+        }
+
+        linkAs("libz_bundled.so", "libz.so.1")
+        linkAs("libssl_bundled.so", "libssl.so.3")
+        linkAs("libcrypto_bundled.so", "libcrypto.so.3")
     }
 
     /** Seeds a default prompt + the atk() shell function once. This file is
